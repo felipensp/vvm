@@ -78,7 +78,10 @@ pub fn (mut v VVM) run(mut ir_ ir.VVMIR) {
 	v.tmp_storage = []ir.Operand{len: int(ir_.tmp_size)}
 
 	eprintln('Running:')
-	for mut i in ir_.ir_list {
+	mut pc := 0
+	last_pc := ir_.ir_list.len - 1
+	for {
+		mut i := ir_.ir_list[pc]
 		match i.ins {
 			// fn call operation
 			.call_ {
@@ -90,5 +93,9 @@ pub fn (mut v VVM) run(mut ir_ ir.VVMIR) {
 			}
 			else {}
 		}
+		if pc == last_pc {
+			break
+		}
+		pc += 1
 	}
 }
