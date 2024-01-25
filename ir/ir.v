@@ -14,6 +14,7 @@ pub enum Ins {
 	sub_ // math: - operation
 	div_ // math: / operation
 	mul_ // math: * operation
+	jmpz_ // jmp if zero
 	unknown_
 }
 
@@ -150,6 +151,15 @@ fn (mut i VVMIR) new_lit(val OpValue) Operand {
 }
 
 @[inline]
+fn (mut i VVMIR) get_jmp() Operand {
+	res := Operand{
+		typ: .jmp
+		value: i64(i.ir_list.len)
+	}
+	return res
+}
+
+@[inline]
 fn (mut i VVMIR) new_tmp() Operand {
 	res := Operand{
 		typ: .tmp
@@ -160,8 +170,9 @@ fn (mut i VVMIR) new_tmp() Operand {
 }
 
 @[inline]
-fn (mut i VVMIR) emit(ir_ IR) {
+fn (mut i VVMIR) emit(ir_ IR) &IR {
 	i.ir_list << ir_
+	return &i.ir_list[i.ir_list.len - 1]
 }
 
 fn (mut i VVMIR) gen_infixexpr(expr &ast.InfixExpr) Operand {
@@ -185,9 +196,21 @@ fn (mut i VVMIR) gen_infixexpr(expr &ast.InfixExpr) Operand {
 	}
 }
 
+fn (mut i VVMIR) gen_if(expr &ast.IfExpr) {
+	for branch in expr.branches {
+		mut ir_ := i.emit(IR{
+			ins: .jmpz_
+			op1: i.get_op(branch.cond)
+		})
+		i.gen_stmts(branch.stmts)
+		ir_.res = i.get_jmp()
+	}
+}
+
 fn (mut i VVMIR) gen_expr(expr &ast.Expr) {
 	match expr {
 		ast.CallExpr { i.gen_call(&expr) }
+		ast.IfExpr { i.gen_if(&expr) }
 		else { dump(expr) }
 	}
 }

@@ -5,6 +5,7 @@ import ir
 @[heap]
 pub struct VVM {
 mut:
+	pc          i64 // program counter
 	tmp_storage []ir.Operand // storage for temporary values like binary operation, returns, etc
 }
 
@@ -73,15 +74,30 @@ pub fn (mut v VVM) call(mut i ir.IR) {
 	}
 }
 
+@[inline]
+pub fn (mut v VVM) jmpz(mut i ir.IR) {
+	res := v.get_value(i.op1)
+	match res {
+		bool {
+			if !res {
+				v.pc = i.res.value as i64
+				return
+			}
+		}
+		else {}
+	}
+	v.pc += 1
+}
+
 // run executes the intermediate representation
 pub fn (mut v VVM) run(mut ir_ ir.VVMIR) {
 	v.tmp_storage = []ir.Operand{len: int(ir_.tmp_size)}
 
 	eprintln('Running:')
-	mut pc := 0
+
 	last_pc := ir_.ir_list.len - 1
 	for {
-		mut i := ir_.ir_list[pc]
+		mut i := ir_.ir_list[v.pc]
 		match i.ins {
 			// fn call operation
 			.call_ {
@@ -91,11 +107,19 @@ pub fn (mut v VVM) run(mut ir_ ir.VVMIR) {
 			.add_, .sub_, .mul_, .div_ {
 				v.math_op(mut i)
 			}
+			// jmp operations
+			.jmpz_ {
+				v.jmpz(mut i)
+				if v.pc > last_pc {
+					break
+				}
+				continue
+			}
 			else {}
 		}
-		if pc == last_pc {
+		if v.pc == last_pc {
 			break
 		}
-		pc += 1
+		v.pc += 1
 	}
 }
