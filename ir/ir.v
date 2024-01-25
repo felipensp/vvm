@@ -1,5 +1,6 @@
 module ir
 
+import v.token
 import v.ast
 import v.pref
 import v.parser
@@ -10,6 +11,8 @@ pub enum Ins {
 	call_ // function call
 	add_ // math: + operation
 	sub_ // math: - operation
+	div_ // math: / operation
+	mul_ // math: * operation
 }
 
 pub type OpValue = i64 | int | string
@@ -17,10 +20,9 @@ pub type OpValue = i64 | int | string
 pub enum OpType {
 	unused
 	literal
-	fetch_var
-	fetch_const
-	fetch_tmp
-	jmp_addr
+	var
+	tmp
+	jmp
 }
 
 pub struct Operand {
@@ -117,15 +119,25 @@ fn (mut i VVMIR) get_op(expr &ast.Expr) Operand {
 	}
 }
 
+fn (mut i VVMIR) get_ins(op token.Kind) Ins {
+	return match op {
+		.plus { .add_ }
+		.minus { .sub_ }
+		.mul { .mul_ }
+		.div { .div_ }
+		else { .add_ }
+	}
+}
+
 fn (mut i VVMIR) gen_infixexpr(expr &ast.InfixExpr) Operand {
 	match expr.op {
-		.plus, .minus {
+		.plus, .minus, .mul, .div {
 			i.ir_list << IR{
-				ins: if expr.op == .plus { .add_ } else { .sub_ }
+				ins: i.get_ins(expr.op)
 				op1: i.get_op(expr.left)
 				op2: i.get_op(expr.right)
 				res: Operand{
-					typ: .fetch_tmp
+					typ: .tmp
 					value: i.tmp_size
 				}
 			}
@@ -137,7 +149,7 @@ fn (mut i VVMIR) gen_infixexpr(expr &ast.InfixExpr) Operand {
 		}
 	}
 	return Operand{
-		typ: .fetch_tmp
+		typ: .tmp
 	}
 }
 
