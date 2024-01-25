@@ -4,4 +4,6 @@ fn main() {
 	println(2 - 3)
 	println(3 * 3)
 	println(10 / 5)
+	println(true)
+	println(false)
 }

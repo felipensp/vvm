@@ -5,10 +5,11 @@ import ir
 @[heap]
 pub struct VVM {
 mut:
-	tmp_storage   []ir.Operand
-	const_storage []ir.Operand
+	tmp_storage []ir.Operand // storage for temporary values like binary operation, returns, etc
 }
 
+// get_value retrieves the pointer to operand value
+@[inline]
 pub fn (mut v VVM) get_value(op &ir.Operand) &ir.OpValue {
 	match op.typ {
 		.tmp {
@@ -63,7 +64,7 @@ pub fn (mut v VVM) call(mut i ir.IR) {
 		'println' {
 			val := v.get_value(i.op2)
 			match val {
-				string, i64, int {
+				string, i64, int, bool {
 					println(val)
 				}
 			}
@@ -72,9 +73,9 @@ pub fn (mut v VVM) call(mut i ir.IR) {
 	}
 }
 
+// run executes the intermediate representation
 pub fn (mut v VVM) run(mut ir_ ir.VVMIR) {
 	v.tmp_storage = []ir.Operand{len: int(ir_.tmp_size)}
-	v.const_storage = []ir.Operand{len: int(ir_.const_size)}
 
 	eprintln('Running:')
 	for mut i in ir_.ir_list {
