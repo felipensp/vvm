@@ -6,26 +6,55 @@ import v.parser
 import strings
 
 pub enum Ins {
-	module_
-	print_
-	call_
+	import_ // import handling
+	call_ // function call
+	add_ // math: + operation
+	sub_ // math: - operation
 }
 
-type Operand = int | string
+pub type OpValue = i64 | int | string
+
+pub enum OpType {
+	unused
+	literal
+	fetch_var
+	fetch_const
+	fetch_tmp
+	jmp_addr
+}
+
+pub struct Operand {
+pub:
+	typ OpType
+pub mut:
+	value OpValue
+}
 
 @[minify]
-struct IR {
+pub struct IR {
 pub:
 	ins Ins
-	op1 Operand
-	op2 Operand
-	res Operand
+	op1 Operand = Operand{
+		typ: .unused
+		value: OpValue(i64(0))
+	}
+	op2 Operand = Operand{
+		typ: .unused
+		value: OpValue(i64(0))
+	}
+pub mut:
+	res Operand = Operand{
+		typ: .unused
+		value: OpValue(i64(0))
+	}
 }
 
 @[heap]
 pub struct VVMIR {
 pub mut:
-	ir_list []IR
+	ir_list    []IR
+	tmp_size   i64
+	const_size i64
 }
 
 struct Tree {
@@ -54,8 +83,61 @@ fn (mut i VVMIR) gen_fn_decl(func &ast.FnDecl) {
 fn (mut i VVMIR) gen_call(call &ast.CallExpr) {
 	i.ir_list << IR{
 		ins: .call_
-		op1: call.name
-		op2: (call.args[0].expr as ast.StringLiteral).val
+		op1: Operand{
+			typ: .literal
+			value: call.name
+		}
+		op2: i.get_op(call.args[0].expr)
+	}
+}
+
+// get_ops generates the Operand from AST Expr
+fn (mut i VVMIR) get_op(expr &ast.Expr) Operand {
+	match expr {
+		ast.StringLiteral {
+			return Operand{
+				typ: .literal
+				value: expr.val.str()
+			}
+		}
+		ast.IntegerLiteral {
+			return Operand{
+				typ: .literal
+				value: expr.val.int()
+			}
+		}
+		ast.InfixExpr {
+			return i.gen_infixexpr(&expr)
+		}
+		else {
+			return Operand{
+				typ: .unused
+			}
+		}
+	}
+}
+
+fn (mut i VVMIR) gen_infixexpr(expr &ast.InfixExpr) Operand {
+	match expr.op {
+		.plus, .minus {
+			i.ir_list << IR{
+				ins: if expr.op == .plus { .add_ } else { .sub_ }
+				op1: i.get_op(expr.left)
+				op2: i.get_op(expr.right)
+				res: Operand{
+					typ: .fetch_tmp
+					value: i.tmp_size
+				}
+			}
+			i.tmp_size++
+			return i.ir_list.last().res
+		}
+		else {
+			eprintln('not implemented ${expr.op}')
+		}
+	}
+	return Operand{
+		typ: .fetch_tmp
 	}
 }
 
@@ -121,15 +203,26 @@ pub fn (mut i VVMIR) parse_file(file string) {
 }
 
 fn (op Operand) str() string {
-	if op is string {
-		return 's"${string(op)}"'
+	mut s := ''
+	s += op.typ.str()[0..3]
+	if op.value is string {
+		s += '$'
+		s += op.value as string
+	} else if op.value is int {
+		s += '.'
+		s += op.value.str()
+	} else if op.value is i64 {
+		s += '.'
+		s += op.value.str()
 	} else {
-		return 'unused'
+		s += '.'
+		s += op.value.str()
 	}
+	return s
 }
 
 fn (ii IR) str() string {
-	return '${ii.ins:10s} | ${ii.op1:10s} | ${ii.op2:10s} | ${ii.res:10s}'
+	return '${ii.ins:10s} | ${ii.op1:15s} | ${ii.op2:15s} | ${ii.res:10s}'
 }
 
 pub fn (i VVMIR) str() string {
@@ -137,6 +230,7 @@ pub fn (i VVMIR) str() string {
 	mut s := strings.new_builder(100)
 	for item in i.ir_list {
 		s.write_string(item.str())
+		s.write_string('\n')
 	}
 	return s.str()
 }

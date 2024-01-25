@@ -37,7 +37,7 @@ fn main() {
 		} else {
 			mut vvm_vm := vm.VVM{}
 			eprintln(vvm_ir)
-			vvm_vm.run(vvm_ir)
+			vvm_vm.run(mut vvm_ir)
 		}
 	} else {
 		eprintln(fp.usage())
