@@ -24,35 +24,180 @@ fn (mut v VVM) get_value(op &ir.Operand) &ir.OpValue {
 	}
 }
 
+@[inline]
+fn (mut v VVM) logic_op(mut i ir.IR) {
+	op1_val := v.get_value(i.op1)
+	op2_val := v.get_value(i.op2)
+	res := v.get_value(i.res)
+	match i.ins {
+		.le_ {
+			unsafe {
+				match op1_val {
+					int {
+						*res = ir.OpValue(op1_val <= (op2_val as int))
+					}
+					i64 {
+						*res = ir.OpValue(op1_val <= (op2_val as i64))
+					}
+					else {
+						v.error('${@FN} - not implemented - op: ${op1_val}')
+					}
+				}
+			}
+		}
+		.lt_ {
+			unsafe {
+				match op1_val {
+					int {
+						*res = ir.OpValue(op1_val < (op2_val as int))
+					}
+					i64 {
+						*res = ir.OpValue(op1_val < (op2_val as i64))
+					}
+					else {
+						v.error('${@FN} - not implemented - op: ${op1_val}')
+					}
+				}
+			}
+		}
+		.ge_ {
+			unsafe {
+				match op1_val {
+					int {
+						*res = ir.OpValue(op1_val >= (op2_val as int))
+					}
+					i64 {
+						*res = ir.OpValue(op1_val >= (op2_val as i64))
+					}
+					else {
+						v.error('${@FN} - not implemented - op: ${op1_val}')
+					}
+				}
+			}
+		}
+		.gt_ {
+			unsafe {
+				match op1_val {
+					int {
+						*res = ir.OpValue(op1_val > (op2_val as int))
+					}
+					i64 {
+						*res = ir.OpValue(op1_val > (op2_val as i64))
+					}
+					else {
+						v.error('${@FN} - not implemented - op: ${op1_val}')
+					}
+				}
+			}
+		}
+		.eq_ {
+			unsafe {
+				match op1_val {
+					int {
+						*res = ir.OpValue(op1_val == (op2_val as int))
+					}
+					i64 {
+						*res = ir.OpValue(op1_val == (op2_val as i64))
+					}
+					else {
+						v.error('${@FN} - not implemented - op: ${op1_val}')
+					}
+				}
+			}
+		}
+		.ne_ {
+			unsafe {
+				*res = ir.OpValue(op1_val != op2_val)
+			}
+		}
+		else {}
+	}
+}
+
+fn (mut v VVM) error(msg string) {
+	eprintln('vm error: ${msg}')
+}
+
 // math_op implements basic math operation
 @[inline]
 fn (mut v VVM) math_op(mut i ir.IR) {
 	op1_val := v.get_value(i.op1)
 	op2_val := v.get_value(i.op2)
-
-	op1_ival := if op1_val is int { op1_val } else { int(op1_val) }
-	op2_ival := if op2_val is int { op2_val } else { int(op2_val) }
-
 	res := v.get_value(i.res)
 	match i.ins {
 		.add_ {
 			unsafe {
-				*res = ir.OpValue(op1_ival + op2_ival)
+				match op1_val {
+					int {
+						*res = ir.OpValue(op1_val + (op2_val as int))
+					}
+					i64 {
+						*res = ir.OpValue(op1_val + (op2_val as i64))
+					}
+					else {
+						v.error('${@FN} - not implemented - op: ${op1_val}')
+					}
+				}
 			}
 		}
 		.sub_ {
 			unsafe {
-				*res = ir.OpValue(op1_ival - op2_ival)
+				match op1_val {
+					int {
+						*res = ir.OpValue(op1_val - (op2_val as int))
+					}
+					i64 {
+						*res = ir.OpValue(op1_val - (op2_val as i64))
+					}
+					else {
+						v.error('${@FN} - not implemented - op: ${op1_val}')
+					}
+				}
 			}
 		}
 		.div_ {
 			unsafe {
-				*res = ir.OpValue(op1_ival / op2_ival)
+				match op1_val {
+					int {
+						*res = ir.OpValue(op1_val / (op2_val as int))
+					}
+					i64 {
+						*res = ir.OpValue(op1_val / (op2_val as i64))
+					}
+					else {
+						v.error('${@FN} - not implemented - op: ${op1_val}')
+					}
+				}
 			}
 		}
 		.mul_ {
 			unsafe {
-				*res = ir.OpValue(op1_ival * op2_ival)
+				match op1_val {
+					int {
+						*res = ir.OpValue(op1_val * (op2_val as int))
+					}
+					i64 {
+						*res = ir.OpValue(op1_val * (op2_val as i64))
+					}
+					else {
+						v.error('${@FN} - not implemented - op: ${op1_val}')
+					}
+				}
+			}
+		}
+		.mod_ {
+			unsafe {
+				match op1_val {
+					int {
+						*res = ir.OpValue(op1_val % (op2_val as int))
+					}
+					i64 {
+						*res = ir.OpValue(op1_val % (op2_val as i64))
+					}
+					else {
+						v.error('${@FN} - not implemented - op: ${op1_val}')
+					}
+				}
 			}
 		}
 		else {}
@@ -122,6 +267,10 @@ pub fn (mut v VVM) run(mut ir_ ir.VVMIR) {
 			// math operations
 			.add_, .sub_, .mul_, .div_ {
 				v.math_op(mut i)
+			}
+			// logic operations
+			.le_, .lt_, .ge_, .gt_, .ne_, .eq_ {
+				v.logic_op(mut i)
 			}
 			// jmp operations
 			.jmpz_ {

@@ -14,6 +14,13 @@ pub enum Ins {
 	sub_ // math: - operation
 	div_ // math: / operation
 	mul_ // math: * operation
+	mod_ // math: % operation
+	eq_ // logic: = operation
+	ne_ // logic: != operation
+	gt_ // logic: > operation
+	ge_ // logic: >= operation
+	le_ // logic: < operation
+	lt_ // logic: <= operation
 	jmpz_ // jmp if zero
 	ret_ // return
 	unknown_
@@ -122,9 +129,7 @@ fn (mut i VVMIR) get_op(expr &ast.Expr) Operand {
 			return i.new_lit(expr.val.int())
 		}
 		ast.BoolLiteral {
-			{
-				return i.new_lit(expr.val)
-			}
+			return i.new_lit(expr.val)
 		}
 		ast.InfixExpr {
 			return i.gen_infixexpr(&expr)
@@ -141,10 +146,17 @@ fn (mut i VVMIR) get_op(expr &ast.Expr) Operand {
 @[inline]
 fn (mut i VVMIR) get_ins(op token.Kind) Ins {
 	return match op {
-		.plus { .add_ }
-		.minus { .sub_ }
-		.mul { .mul_ }
-		.div { .div_ }
+		.plus { .add_ } // +
+		.minus { .sub_ } // -
+		.mul { .mul_ } // *
+		.div { .div_ } // /
+		.mod { .mod_ } // %
+		.gt { .gt_ } // >
+		.ge { .ge_ } // >=
+		.lt { .lt_ } // <
+		.le { .le_ } // <=		
+		.ne { .ne_ } // !=
+		.eq { .eq_ } // ==
 		else { .unknown_ }
 	}
 }
@@ -205,24 +217,14 @@ fn (mut i VVMIR) emit(ir_ IR) &IR {
 }
 
 fn (mut i VVMIR) gen_infixexpr(expr &ast.InfixExpr) Operand {
-	match expr.op {
-		.plus, .minus, .mul, .div {
-			tmp := i.new_tmp()
-			i.emit(IR{
-				ins: i.get_ins(expr.op)
-				op1: i.get_op(expr.left)
-				op2: i.get_op(expr.right)
-				res: tmp
-			})
-			return tmp
-		}
-		else {
-			eprintln('not implemented ${expr.op}')
-		}
-	}
-	return Operand{
-		typ: .tmp
-	}
+	tmp := i.new_tmp()
+	i.emit(IR{
+		ins: i.get_ins(expr.op)
+		op1: i.get_op(expr.left)
+		op2: i.get_op(expr.right)
+		res: tmp
+	})
+	return tmp
 }
 
 fn (mut i VVMIR) gen_if(expr &ast.IfExpr) {
