@@ -4,14 +4,16 @@ import ir
 
 @[heap]
 pub struct VVM {
+	vir &ir.VVMIR
 mut:
 	pc          i64 // program counter
+	ret_addr    i64 // return address
 	tmp_storage []ir.Operand // storage for temporary values like binary operation, returns, etc
 }
 
 // get_value retrieves the pointer to operand value
 @[inline]
-pub fn (mut v VVM) get_value(op &ir.Operand) &ir.OpValue {
+fn (mut v VVM) get_value(op &ir.Operand) &ir.OpValue {
 	match op.typ {
 		.tmp {
 			return &v.tmp_storage[op.value as i64].value
@@ -24,7 +26,7 @@ pub fn (mut v VVM) get_value(op &ir.Operand) &ir.OpValue {
 
 // math_op implements basic math operation
 @[inline]
-pub fn (mut v VVM) math_op(mut i ir.IR) {
+fn (mut v VVM) math_op(mut i ir.IR) {
 	op1_val := v.get_value(i.op1)
 	op2_val := v.get_value(i.op2)
 
@@ -59,23 +61,32 @@ pub fn (mut v VVM) math_op(mut i ir.IR) {
 
 // call implements function calling
 @[inline]
-pub fn (mut v VVM) call(mut i ir.IR) {
-	fnc := i.op1.value as string
-	match fnc {
-		'println' {
+fn (mut v VVM) call(mut i ir.IR) {
+	fn_name := i.op1.value as string
+	match fn_name {
+		'main.print' {
 			val := v.get_value(i.op2)
-			match val {
-				string, i64, int, bool {
-					println(val)
-				}
+			if val is []ir.Operand {
+				print(*v.get_value(val[0]))
 			}
 		}
-		else {}
+		'main.println' {
+			val := v.get_value(i.op2)
+			if val is []ir.Operand {
+				println(*v.get_value(val[0]))
+			}
+		}
+		else {
+			if fn_addr := v.vir.fn_map[fn_name] {
+				v.ret_addr = v.pc
+				v.pc = fn_addr - 1
+			}
+		}
 	}
 }
 
 @[inline]
-pub fn (mut v VVM) jmpz(mut i ir.IR) {
+fn (mut v VVM) jmpz(mut i ir.IR) {
 	res := v.get_value(i.op1)
 	match res {
 		bool {
@@ -89,12 +100,17 @@ pub fn (mut v VVM) jmpz(mut i ir.IR) {
 	v.pc += 1
 }
 
+@[inline]
+fn (mut v VVM) ret(mut i ir.IR) {
+	v.pc = v.ret_addr
+}
+
 // run executes the intermediate representation
 pub fn (mut v VVM) run(mut ir_ ir.VVMIR) {
 	v.tmp_storage = []ir.Operand{len: int(ir_.tmp_size)}
 
-	eprintln('Running:')
-
+	eprintln('Running (entry point=${ir_.entry_point.hex()}):')
+	v.pc = ir_.entry_point
 	last_pc := ir_.ir_list.len - 1
 	for {
 		mut i := ir_.ir_list[v.pc]
@@ -114,6 +130,9 @@ pub fn (mut v VVM) run(mut ir_ ir.VVMIR) {
 					break
 				}
 				continue
+			}
+			.ret_ {
+				v.ret(mut i)
 			}
 			else {}
 		}

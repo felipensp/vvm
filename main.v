@@ -35,7 +35,9 @@ fn main() {
 		if opts.dumpir {
 			eprintln(vvm_ir)
 		} else {
-			mut vvm_vm := vm.VVM{}
+			mut vvm_vm := vm.VVM{
+				vir: &vvm_ir
+			}
 			eprintln(vvm_ir)
 			vvm_vm.run(mut vvm_ir)
 		}

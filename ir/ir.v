@@ -15,19 +15,21 @@ pub enum Ins {
 	div_ // math: / operation
 	mul_ // math: * operation
 	jmpz_ // jmp if zero
+	ret_ // return
 	unknown_
 }
 
 // VM Operand value type
-pub type OpValue = bool | i64 | int | string
+pub type OpValue = []Operand | bool | i64 | int | string
 
 // VM Operand type
 pub enum OpType {
-	unused
-	literal
-	var
-	tmp
-	jmp
+	unused // operand is unused
+	literal // operand is literal value
+	var // operand is a var
+	tmp // operand is a temporary storage
+	jmp // operand is a jmp address
+	arr // operand is array of operands
 }
 
 // VM Operand
@@ -62,8 +64,10 @@ pub mut:
 @[heap]
 pub struct VVMIR {
 pub mut:
-	ir_list  []IR
-	tmp_size i64 // temporary counter
+	ir_list     []IR // IR list
+	entry_point i64  // offset to start
+	tmp_size    i64  // temporary counter
+	fn_map      map[string]i64 // fn map / name => offset
 }
 
 struct Tree {
@@ -86,14 +90,23 @@ fn (mut i VVMIR) gen_module(mod &ast.Module) {
 }
 
 fn (mut i VVMIR) gen_fn_decl(func &ast.FnDecl) {
-	i.gen_stmts(func.stmts)
+	start_addr := i.get_jmp().value as i64
+	if func.is_main {
+		i.entry_point = start_addr
+		i.gen_stmts(func.stmts)
+	} else {
+		i.fn_map[func.name] = start_addr
+		i.gen_stmts(func.stmts)
+		i.emit(IR{ ins: .ret_ })
+	}
 }
 
 fn (mut i VVMIR) gen_call(call &ast.CallExpr) {
 	i.emit(IR{
 		ins: .call_
-		op1: i.new_str(call.name)
-		op2: i.get_op(call.args[0].expr)
+		op1: i.new_str('${call.mod}.${call.name}')
+		op2: i.new_arr(call.args.map(i.get_op(it.expr)))
+		res: i.new_tmp()
 	})
 }
 
@@ -146,6 +159,14 @@ fn (mut i VVMIR) new_str(val string) Operand {
 fn (mut i VVMIR) new_lit(val OpValue) Operand {
 	return Operand{
 		typ: .literal
+		value: val
+	}
+}
+
+@[inline]
+fn (mut i VVMIR) new_arr(val []Operand) Operand {
+	return Operand{
+		typ: .arr
 		value: val
 	}
 }
@@ -283,13 +304,34 @@ fn (op Operand) str() string {
 			s += '.'
 			s += op.value.str()
 		}
+		[]Operand {
+			s += '.[]args'
+		}
 	}
 	return s
 }
 
 @[inline]
-fn (ii IR) str() string {
-	return '${ii.ins:10s} | ${ii.op1:15s} | ${ii.op2:15s} | ${ii.res:10s}'
+pub fn (o &OpValue) str() string {
+	match o {
+		string {
+			return o as string
+		}
+		int, i64 {
+			return o.str()
+		}
+		bool {
+			return o.str()
+		}
+		[]Operand {
+			return ''
+		}
+	}
+}
+
+@[inline]
+fn (i IR) str() string {
+	return '${i.ins:10s} | ${i.op1:20s} | ${i.op2:20s} | ${i.res:10s}'
 }
 
 pub fn (i VVMIR) str() string {
