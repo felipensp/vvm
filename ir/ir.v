@@ -12,6 +12,7 @@ pub enum Ins {
 	oscope_ // begin scope
 	escope_ // end scope
 	decl_ // var declaration
+	pass_ // pass args
 	call_ // function call
 	add_ // math: + operation
 	sub_ // math: - operation
@@ -74,7 +75,7 @@ pub mut:
 @[heap]
 pub struct VVMIR {
 pub mut:
-	ir_list     []IR = []IR{cap: 30} // IR list
+	ir_list     []IR = []IR{cap: 50} // IR list
 	entry_point i64  // offset to start
 	tmp_size    i64  // temporary counter
 	fn_map      map[string]i64 // fn map / name => offset
@@ -108,8 +109,8 @@ fn (mut i VVMIR) gen_fn_decl(func &ast.FnDecl) {
 		i.gen_stmts(func.stmts)
 	} else {
 		i.fn_map[func.name] = start_addr
+		i.emit(IR{ ins: .pass_, op1: i.new_arr(func.params.map(i.new_str(it.name))) })
 		i.gen_stmts(func.stmts)
-		i.emit(IR{ ins: .ret_ })
 	}
 	i.emit(IR{ ins: .escope_ })
 }
@@ -330,8 +331,14 @@ pub fn (mut i VVMIR) parse_file(file string) {
 }
 
 pub fn (op Operand) str() string {
+	if op.typ == .unused {
+		return op.typ.str()
+	}
+
 	mut s := ''
-	s += op.typ.str()[0..3]
+	if op.typ != .arr {
+		s += op.typ.str()[0..3]
+	}
 	match op.value {
 		string {
 			s += '$'
@@ -342,7 +349,13 @@ pub fn (op Operand) str() string {
 			s += op.value.str()
 		}
 		[]Operand {
-			s += '.[]args'
+			s += '['
+			for item in op.value {
+				s += item.str()[0..3]
+				s += ','
+			}
+			s = s.trim_right(',')
+			s += ']'
 		}
 	}
 	return s

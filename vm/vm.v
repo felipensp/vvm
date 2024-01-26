@@ -2,17 +2,18 @@ module vm
 
 import ir
 
-type VmScope = map[string]ir.Operand
+type VmScope = map[string]ir.OpValue
 
 @[heap]
 pub struct VVM {
 	vir &ir.VVMIR
 mut:
-	pc          i64 // program counter
-	ret_addr    i64 // return address
-	tmp_storage []ir.Operand // storage for temporary values like binary operation, returns, etc
-	scope_stack []VmScope    // scope stack
-	scope       &VmScope = unsafe { nil } // current scope
+	pc            i64          // program counter
+	ret_stack     []i64          = []i64{cap: 20} // return address stack
+	tmp_storage   []ir.Operand   = []ir.Operand{cap: 20} // storage for temporary values like binary operation, returns, etc
+	scope_stack   []VmScope      = []VmScope{cap: 20} // scope stack
+	scope         &VmScope       = unsafe { nil } // current scope
+	fn_args_stack [][]ir.OpValue = [][]ir.OpValue{cap: 20}
 }
 
 // get_value retrieves the pointer to operand value
@@ -23,7 +24,13 @@ fn (mut v VVM) get_value(op &ir.Operand) &ir.OpValue {
 			return &v.tmp_storage[op.value as i64].value
 		}
 		.var {
-			return unsafe { v.get_value(v.scope[op.value as string]) }
+			if v.scope == unsafe { nil } {
+				v.error('no scope found')
+			}
+			if v.scope.len == 0 {
+				v.error('scope is empty')
+			}
+			return unsafe { &v.scope[op.value as string] }
 		}
 		else {
 			return &op.value
@@ -144,7 +151,7 @@ fn (mut v VVM) logic_op(mut i ir.IR) {
 }
 
 fn (mut v VVM) error(msg string) {
-	eprintln('vm error: ${msg}')
+	eprintln('vm error: ${msg} [pc=${v.pc:04d}]')
 }
 
 // math_op implements basic math operation
@@ -233,6 +240,18 @@ fn (mut v VVM) math_op(mut i ir.IR) {
 	}
 }
 
+@[inline]
+fn (mut v VVM) pass(mut i ir.IR) {
+	arg_values := i.op1.value as []ir.Operand
+	fn_args := v.fn_args_stack.pop()
+	for k, arg in arg_values {
+		key := arg.value as string
+		unsafe {
+			v.scope[key] = fn_args[k]
+		}
+	}
+}
+
 // call implements function calling
 @[inline]
 fn (mut v VVM) call(mut i ir.IR) {
@@ -252,8 +271,15 @@ fn (mut v VVM) call(mut i ir.IR) {
 		}
 		else {
 			if fn_addr := v.vir.fn_map[fn_name] {
-				v.ret_addr = v.pc
+				v.ret_stack << v.pc
 				v.pc = fn_addr - 1
+
+				args := i.op2.value as []ir.Operand
+				mut fn_args := []ir.OpValue{}
+				for arg in args {
+					fn_args << *v.get_value(arg)
+				}
+				v.fn_args_stack << fn_args
 			}
 		}
 	}
@@ -276,20 +302,33 @@ fn (mut v VVM) jmpz(mut i ir.IR) {
 
 @[inline]
 fn (mut v VVM) ret(mut i ir.IR) {
-	v.pc = v.ret_addr
+	if v.ret_stack.len > 0 {
+		v.pc = v.ret_stack.pop()
+	} else {
+		v.error('no ret addr to pop')
+	}
 }
 
 @[inline]
 fn (mut v VVM) open_scope() {
-	v.scope_stack << map[string]ir.Operand{}
+	v.scope_stack << map[string]ir.OpValue{}
 	v.scope = &v.scope_stack[v.scope_stack.len - 1]
 }
 
 @[inline]
 fn (mut v VVM) end_scope() {
+	if v.scope_stack.len == 0 {
+		v.error('no scope to pop')
+		return
+	}
 	v.scope_stack.pop()
-	if v.scope_stack.len > 0 {
+	if v.scope_stack.len != 0 {
 		v.scope = &v.scope_stack[v.scope_stack.len - 1]
+		if v.ret_stack.len > 0 {
+			v.pc = v.ret_stack.pop()
+		}
+	} else {
+		v.scope = unsafe { nil }
 	}
 }
 
@@ -297,17 +336,21 @@ fn (mut v VVM) end_scope() {
 fn (mut v VVM) decl(mut i ir.IR) {
 	var_name := i.op1.value as string
 	unsafe {
-		v.scope[var_name] = i.op2
+		v.scope[var_name] = i.op2.value
 	}
 }
 
 // run executes the intermediate representation
 pub fn (mut v VVM) run(mut ir_ ir.VVMIR) {
-	v.tmp_storage = []ir.Operand{len: int(ir_.tmp_size)}
+	eprintln('Running (entry point=${ir_.entry_point:04d}):')
 
-	eprintln('Running (entry point=${ir_.entry_point.hex()}):')
+	// temporary storage for all program
+	v.tmp_storage = []ir.Operand{len: int(ir_.tmp_size)}
+	// entry point
 	v.pc = ir_.entry_point
+	// last instruction
 	last_pc := ir_.ir_list.len - 1
+
 	for {
 		mut i := ir_.ir_list[v.pc]
 		match i.ins {
@@ -317,30 +360,29 @@ pub fn (mut v VVM) run(mut ir_ ir.VVMIR) {
 			.escope_ { // scope end
 				v.end_scope()
 			}
-			// fn call operation
-			.call_ {
+			.pass_ { // pass arg
+				v.pass(mut i)
+			}
+			.call_ { // fn call operation
 				v.call(mut i)
 			}
-			// math operations
-			.add_, .sub_, .mul_, .div_ {
+			.add_, .sub_, .mul_, .div_ { // math operations
 				v.math_op(mut i)
 			}
-			// logic operations
-			.le_, .lt_, .ge_, .gt_, .ne_, .eq_ {
+			.le_, .lt_, .ge_, .gt_, .ne_, .eq_ { // logic operations
 				v.logic_op(mut i)
 			}
-			// jmp operations
-			.jmpz_ {
+			.jmpz_ { // jmp operations
 				v.jmpz(mut i)
 				if v.pc > last_pc {
 					break
 				}
 				continue
 			}
-			.ret_ {
+			.ret_ { // return
 				v.ret(mut i)
 			}
-			.decl_ {
+			.decl_ { // var decl
 				v.decl(mut i)
 			}
 			else {}
