@@ -89,6 +89,7 @@ fn new_object() &Node {
 fn (mut i VVMIR) gen_module(mod &ast.Module) {
 }
 
+// gen_fn_decl emits IR for fn declaration
 fn (mut i VVMIR) gen_fn_decl(func &ast.FnDecl) {
 	start_addr := i.get_jmp().value as i64
 	if func.is_main {
@@ -101,6 +102,7 @@ fn (mut i VVMIR) gen_fn_decl(func &ast.FnDecl) {
 	}
 }
 
+// gen_call emits IR for fn calling
 fn (mut i VVMIR) gen_call(call &ast.CallExpr) {
 	i.emit(IR{
 		ins: .call_
@@ -147,6 +149,7 @@ fn (mut i VVMIR) get_ins(op token.Kind) Ins {
 	}
 }
 
+// new_str creates a literal str operand
 @[inline]
 fn (mut i VVMIR) new_str(val string) Operand {
 	return Operand{
@@ -155,6 +158,7 @@ fn (mut i VVMIR) new_str(val string) Operand {
 	}
 }
 
+// new_lit creates a literal operand
 @[inline]
 fn (mut i VVMIR) new_lit(val OpValue) Operand {
 	return Operand{
@@ -163,6 +167,7 @@ fn (mut i VVMIR) new_lit(val OpValue) Operand {
 	}
 }
 
+// new_arr creates a arr of operand as operand
 @[inline]
 fn (mut i VVMIR) new_arr(val []Operand) Operand {
 	return Operand{
@@ -171,6 +176,7 @@ fn (mut i VVMIR) new_arr(val []Operand) Operand {
 	}
 }
 
+// get_jmp creates a jmp addr operand
 @[inline]
 fn (mut i VVMIR) get_jmp() Operand {
 	res := Operand{
@@ -180,6 +186,7 @@ fn (mut i VVMIR) get_jmp() Operand {
 	return res
 }
 
+// new_tmp creates a temporary storage operand
 @[inline]
 fn (mut i VVMIR) new_tmp() Operand {
 	res := Operand{
@@ -190,6 +197,7 @@ fn (mut i VVMIR) new_tmp() Operand {
 	return res
 }
 
+// emit adds a new item to IR list
 @[inline]
 fn (mut i VVMIR) emit(ir_ IR) &IR {
 	i.ir_list << ir_
