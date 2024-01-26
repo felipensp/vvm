@@ -99,6 +99,12 @@ fn (mut v VVM) logic_op(mut i ir.IR) {
 					i64 {
 						*res = ir.OpValue(op1_val == (op2_val as i64))
 					}
+					bool {
+						*res = ir.OpValue(op1_val != (op2_val as bool))
+					}
+					string {
+						*res = ir.OpValue(op1_val != (op2_val as string))
+					}
 					else {
 						v.error('${@FN} - not implemented - op: ${op1_val}')
 					}
@@ -107,7 +113,23 @@ fn (mut v VVM) logic_op(mut i ir.IR) {
 		}
 		.ne_ {
 			unsafe {
-				*res = ir.OpValue(op1_val != op2_val)
+				match op1_val {
+					int {
+						*res = ir.OpValue(op1_val != (op2_val as int))
+					}
+					i64 {
+						*res = ir.OpValue(op1_val != (op2_val as i64))
+					}
+					bool {
+						*res = ir.OpValue(op1_val != (op2_val as bool))
+					}
+					string {
+						*res = ir.OpValue(op1_val != (op2_val as string))
+					}
+					else {
+						v.error('${@FN} - not implemented - op: ${op1_val}')
+					}
+				}
 			}
 		}
 		else {}
