@@ -22,7 +22,7 @@ fn main() {
 
 	mut opts := &VVMOptions{
 		debug: fp.bool('debug', `d`, false, 'show debug information')
-		dumpir: fp.bool('dumpir', `D`, false, 'dump IR only')
+		dumpir: fp.bool('dumpir', `D`, false, 'dump IR')
 		file: fp.string('file', `f`, '', 'Input file')
 		help: fp.bool('help', `h`, false, 'show this help message')
 	}
@@ -32,15 +32,14 @@ fn main() {
 	} else if opts.file != '' {
 		mut vvm_ir := ir.VVMIR{}
 		vvm_ir.parse_file(opts.file)
-		if opts.dumpir {
-			eprintln(vvm_ir)
-		} else {
-			mut vvm_vm := vm.VVM{
-				vir: &vvm_ir
-			}
-			eprintln(vvm_ir)
-			vvm_vm.run(mut vvm_ir)
+		mut vvm_vm := vm.VVM{
+			vir: &vvm_ir
+			debug: opts.debug
 		}
+		if opts.dumpir || opts.debug {
+			eprintln(vvm_ir)
+		}
+		vvm_vm.run(mut vvm_ir)
 	} else {
 		eprintln(fp.usage())
 	}

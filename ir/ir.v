@@ -56,11 +56,11 @@ pub mut:
 pub struct IR {
 pub:
 	ins Ins // VM instruction
+pub mut:
 	op1 Operand = Operand{ // first operand
 		typ: .unused
 		value: OpValue(i64(0))
 	}
-pub mut:
 	op2 Operand = Operand{ // second operand
 		typ: .unused
 		value: OpValue(i64(0))
@@ -75,7 +75,7 @@ pub mut:
 @[heap]
 pub struct VVMIR {
 pub mut:
-	ir_list     []IR = []IR{cap: 50} // IR list
+	ir_list     []IR = []IR{len: 50} // IR list
 	entry_point i64  // offset to start
 	tmp_size    i64  // temporary counter
 	fn_map      map[string]i64 // fn map / name => offset
@@ -104,7 +104,8 @@ fn (mut i VVMIR) gen_module(mod &ast.Module) {
 fn (mut i VVMIR) gen_fn_decl(func &ast.FnDecl) {
 	start_addr := i.get_jmp().value as i64
 
-	i.emit(IR{ ins: .oscope_ })
+	i.tmp_size = 0
+	mut oscope := i.emit(IR{ ins: .oscope_ })
 	if func.is_main {
 		i.entry_point = start_addr
 		i.gen_stmts(func.stmts)
@@ -123,6 +124,7 @@ fn (mut i VVMIR) gen_fn_decl(func &ast.FnDecl) {
 			}
 		}
 	}
+	oscope.op1 = i.new_lit(i.tmp_size)
 	i.emit(IR{ ins: .escope_ })
 }
 

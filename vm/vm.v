@@ -6,14 +6,15 @@ type VmScope = map[string]ir.OpValue
 
 @[heap]
 pub struct VVM {
-	vir &ir.VVMIR
+	vir   &ir.VVMIR
+	debug bool
 mut:
-	pc            i64          // program counter
-	ret_stack     []i64          = []i64{cap: 20} // return address stack
-	tmp_storage   []ir.Operand   = []ir.Operand{cap: 20} // storage for temporary values like binary operation, returns, etc
-	scope_stack   []VmScope      = []VmScope{cap: 20} // scope stack
+	pc            i64   // program counter
+	ret_stack     []i64 = []i64{} // return address stack
+	tmp_storage   [][]ir.Operand = [][]ir.Operand{} // storage for temporary values like binary operation, returns, etc
+	scope_stack   []VmScope      = []VmScope{} // scope stack
 	scope         &VmScope       = unsafe { nil } // current scope
-	fn_args_stack [][]ir.OpValue = [][]ir.OpValue{cap: 20}
+	fn_args_stack [][]ir.OpValue = [][]ir.OpValue{}
 	ret_res_stack []&ir.OpValue
 }
 
@@ -22,7 +23,7 @@ mut:
 fn (mut v VVM) get_value(op &ir.Operand) &ir.OpValue {
 	match op.typ {
 		.tmp {
-			return &v.tmp_storage[op.value as i64].value
+			return &v.tmp_storage.last()[op.value as i64].value
 		}
 		.var {
 			if v.scope == unsafe { nil } {
@@ -318,9 +319,11 @@ fn (mut v VVM) ret(mut i ir.IR) {
 }
 
 @[inline]
-fn (mut v VVM) open_scope() {
+fn (mut v VVM) open_scope(mut i ir.IR) {
 	v.scope_stack << map[string]ir.OpValue{}
 	v.scope = &v.scope_stack[v.scope_stack.len - 1]
+
+	v.tmp_storage << []ir.Operand{len: int(i.op1.value as i64)}
 }
 
 @[inline]
@@ -330,6 +333,7 @@ fn (mut v VVM) end_scope() {
 		return
 	}
 	v.scope_stack.pop()
+	v.tmp_storage.pop()
 	if v.scope_stack.len != 0 {
 		v.scope = &v.scope_stack[v.scope_stack.len - 1]
 		if v.ret_stack.len > 0 {
@@ -350,10 +354,10 @@ fn (mut v VVM) decl(mut i ir.IR) {
 
 // run executes the intermediate representation
 pub fn (mut v VVM) run(mut ir_ ir.VVMIR) {
-	eprintln('Running (entry point=${ir_.entry_point:04d}):')
+	if v.debug {
+		eprintln('Running (entry point=${ir_.entry_point:04d}):')
+	}
 
-	// temporary storage for all program
-	v.tmp_storage = []ir.Operand{len: int(ir_.tmp_size)}
 	// entry point
 	v.pc = ir_.entry_point
 	// last instruction
@@ -363,7 +367,7 @@ pub fn (mut v VVM) run(mut ir_ ir.VVMIR) {
 		mut i := ir_.ir_list[v.pc]
 		match i.ins {
 			.oscope_ { // scope open
-				v.open_scope()
+				v.open_scope(mut i)
 			}
 			.escope_ { // scope end
 				v.end_scope()
