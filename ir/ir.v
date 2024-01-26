@@ -110,7 +110,6 @@ fn (mut i VVMIR) gen_fn_decl(func &ast.FnDecl) {
 		i.gen_stmts(func.stmts)
 	} else {
 		i.fn_map[func.name] = start_addr
-		i.emit(IR{ ins: .oscope_ })
 		i.emit(IR{ ins: .pass_, op1: i.new_arr(func.params.map(i.new_str(it.name))) })
 		i.gen_stmts(func.stmts)
 	}
@@ -128,13 +127,15 @@ fn (mut i VVMIR) gen_fn_decl(func &ast.FnDecl) {
 }
 
 // gen_call emits IR for fn calling
-fn (mut i VVMIR) gen_call(call &ast.CallExpr) {
+fn (mut i VVMIR) gen_call(call &ast.CallExpr) Operand {
+	res := i.new_tmp()
 	i.emit(IR{
 		ins: .call_
 		op1: i.new_str('${call.mod}.${call.name}')
 		op2: i.new_arr(call.args.map(i.get_op(it.expr)))
-		res: i.new_tmp()
+		res: res
 	})
+	return res
 }
 
 // get_ops generates the Operand from AST Expr
@@ -154,6 +155,9 @@ fn (mut i VVMIR) get_op(expr &ast.Expr) Operand {
 		}
 		ast.Ident {
 			return i.new_var(expr.name)
+		}
+		ast.CallExpr {
+			return i.gen_call(&expr)
 		}
 		else {
 			return Operand{
@@ -280,7 +284,7 @@ fn (mut i VVMIR) gen_expr(expr &ast.Expr) {
 }
 
 fn (mut i VVMIR) gen_return(stmt &ast.Return) {
-	i.emit(IR{ ins: .ret_, op1: i.new_arr(stmt.exprs.map(i.get_op(&it))) })
+	i.emit(IR{ ins: .ret_, op1: i.new_arr(stmt.exprs.map(i.get_op(&it))), res: i.new_tmp() })
 }
 
 fn (mut i VVMIR) gen_assign(stmt &ast.AssignStmt) {

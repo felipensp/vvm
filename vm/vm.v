@@ -14,6 +14,7 @@ mut:
 	scope_stack   []VmScope      = []VmScope{cap: 20} // scope stack
 	scope         &VmScope       = unsafe { nil } // current scope
 	fn_args_stack [][]ir.OpValue = [][]ir.OpValue{cap: 20}
+	ret_res_stack []&ir.OpValue
 }
 
 // get_value retrieves the pointer to operand value
@@ -272,6 +273,7 @@ fn (mut v VVM) call(mut i ir.IR) {
 		else {
 			if fn_addr := v.vir.fn_map[fn_name] {
 				v.ret_stack << v.pc
+				v.ret_res_stack << v.get_value(i.res)
 				v.pc = fn_addr - 1
 
 				// load args
@@ -305,6 +307,13 @@ fn (mut v VVM) jmpz(mut i ir.IR) {
 // ret implements return statement
 @[inline]
 fn (mut v VVM) ret(mut i ir.IR) {
+	vals := i.op1.value as []ir.Operand
+	if vals.len > 0 {
+		res := v.ret_res_stack.pop()
+		unsafe {
+			*res = v.get_value(vals[0])
+		}
+	}
 	v.pc = i.op2.value as i64
 }
 
