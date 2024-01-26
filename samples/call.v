@@ -16,5 +16,5 @@ fn bar(arg int) {
 fn main() {
 	foo()
 	bar(123)
-	println('aqui')
+	println('here')
 }

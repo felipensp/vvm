@@ -60,11 +60,11 @@ pub:
 		typ: .unused
 		value: OpValue(i64(0))
 	}
+pub mut:
 	op2 Operand = Operand{ // second operand
 		typ: .unused
 		value: OpValue(i64(0))
 	}
-pub mut:
 	res Operand = Operand{ // result operand
 		typ: .unused
 		value: OpValue(i64(0))
@@ -103,14 +103,26 @@ fn (mut i VVMIR) gen_module(mod &ast.Module) {
 // gen_fn_decl emits IR for fn declaration
 fn (mut i VVMIR) gen_fn_decl(func &ast.FnDecl) {
 	start_addr := i.get_jmp().value as i64
+
 	i.emit(IR{ ins: .oscope_ })
 	if func.is_main {
 		i.entry_point = start_addr
 		i.gen_stmts(func.stmts)
 	} else {
 		i.fn_map[func.name] = start_addr
+		i.emit(IR{ ins: .oscope_ })
 		i.emit(IR{ ins: .pass_, op1: i.new_arr(func.params.map(i.new_str(it.name))) })
 		i.gen_stmts(func.stmts)
+	}
+	// points ret stmts to end of fn scope
+	end_addr := i.get_jmp().value as i64
+	for mut item in i.ir_list[start_addr..end_addr] {
+		if item.ins == .ret_ {
+			item.op2 = Operand{
+				typ: .jmp
+				value: end_addr
+			}
+		}
 	}
 	i.emit(IR{ ins: .escope_ })
 }
@@ -268,9 +280,8 @@ fn (mut i VVMIR) gen_expr(expr &ast.Expr) {
 }
 
 fn (mut i VVMIR) gen_return(stmt &ast.Return) {
-	for expr in stmt.exprs {
-		i.gen_expr(&expr)
-	}
+	dump(stmt.exprs)
+	i.emit(IR{ ins: .ret_, op1: i.new_arr(stmt.exprs.map(i.get_op(&it))) })
 }
 
 fn (mut i VVMIR) gen_assign(stmt &ast.AssignStmt) {
@@ -355,7 +366,7 @@ pub fn (op Operand) str() string {
 				s += ','
 			}
 			s = s.trim_right(',')
-			s += ']'
+			s += ']#${op.value.len}'
 		}
 	}
 	return s

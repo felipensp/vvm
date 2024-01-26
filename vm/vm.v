@@ -274,6 +274,7 @@ fn (mut v VVM) call(mut i ir.IR) {
 				v.ret_stack << v.pc
 				v.pc = fn_addr - 1
 
+				// load args
 				args := i.op2.value as []ir.Operand
 				mut fn_args := []ir.OpValue{}
 				for arg in args {
@@ -285,6 +286,7 @@ fn (mut v VVM) call(mut i ir.IR) {
 	}
 }
 
+// jmpz implements jump if zero
 @[inline]
 fn (mut v VVM) jmpz(mut i ir.IR) {
 	res := v.get_value(i.op1)
@@ -300,13 +302,10 @@ fn (mut v VVM) jmpz(mut i ir.IR) {
 	v.pc += 1
 }
 
+// ret implements return statement
 @[inline]
 fn (mut v VVM) ret(mut i ir.IR) {
-	if v.ret_stack.len > 0 {
-		v.pc = v.ret_stack.pop()
-	} else {
-		v.error('no ret addr to pop')
-	}
+	v.pc = i.op2.value as i64
 }
 
 @[inline]
@@ -336,7 +335,7 @@ fn (mut v VVM) end_scope() {
 fn (mut v VVM) decl(mut i ir.IR) {
 	var_name := i.op1.value as string
 	unsafe {
-		v.scope[var_name] = i.op2.value
+		v.scope[var_name] = *v.get_value(i.op2)
 	}
 }
 
