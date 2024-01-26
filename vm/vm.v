@@ -380,6 +380,7 @@ pub fn (mut v VVM) run(mut ir_ ir.VVMIR) {
 			}
 			.ret_ { // return
 				v.ret(mut i)
+				continue
 			}
 			.decl_ { // var decl
 				v.decl(mut i)

@@ -280,7 +280,6 @@ fn (mut i VVMIR) gen_expr(expr &ast.Expr) {
 }
 
 fn (mut i VVMIR) gen_return(stmt &ast.Return) {
-	dump(stmt.exprs)
 	i.emit(IR{ ins: .ret_, op1: i.new_arr(stmt.exprs.map(i.get_op(&it))) })
 }
 
