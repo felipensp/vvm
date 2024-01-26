@@ -2,6 +2,8 @@ module vm
 
 import ir
 
+type VmScope = map[string]ir.Operand
+
 @[heap]
 pub struct VVM {
 	vir &ir.VVMIR
@@ -9,6 +11,8 @@ mut:
 	pc          i64 // program counter
 	ret_addr    i64 // return address
 	tmp_storage []ir.Operand // storage for temporary values like binary operation, returns, etc
+	scope_stack []VmScope    // scope stack
+	scope       &VmScope = unsafe { nil } // current scope
 }
 
 // get_value retrieves the pointer to operand value
@@ -17,6 +21,9 @@ fn (mut v VVM) get_value(op &ir.Operand) &ir.OpValue {
 	match op.typ {
 		.tmp {
 			return &v.tmp_storage[op.value as i64].value
+		}
+		.var {
+			return unsafe { v.get_value(v.scope[op.value as string]) }
 		}
 		else {
 			return &op.value
@@ -272,6 +279,28 @@ fn (mut v VVM) ret(mut i ir.IR) {
 	v.pc = v.ret_addr
 }
 
+@[inline]
+fn (mut v VVM) open_scope() {
+	v.scope_stack << map[string]ir.Operand{}
+	v.scope = &v.scope_stack[v.scope_stack.len - 1]
+}
+
+@[inline]
+fn (mut v VVM) end_scope() {
+	v.scope_stack.pop()
+	if v.scope_stack.len > 0 {
+		v.scope = &v.scope_stack[v.scope_stack.len - 1]
+	}
+}
+
+@[inline]
+fn (mut v VVM) decl(mut i ir.IR) {
+	var_name := i.op1.value as string
+	unsafe {
+		v.scope[var_name] = i.op2
+	}
+}
+
 // run executes the intermediate representation
 pub fn (mut v VVM) run(mut ir_ ir.VVMIR) {
 	v.tmp_storage = []ir.Operand{len: int(ir_.tmp_size)}
@@ -282,6 +311,12 @@ pub fn (mut v VVM) run(mut ir_ ir.VVMIR) {
 	for {
 		mut i := ir_.ir_list[v.pc]
 		match i.ins {
+			.oscope_ { // scope open
+				v.open_scope()
+			}
+			.escope_ { // scope end
+				v.end_scope()
+			}
 			// fn call operation
 			.call_ {
 				v.call(mut i)
@@ -304,6 +339,9 @@ pub fn (mut v VVM) run(mut ir_ ir.VVMIR) {
 			}
 			.ret_ {
 				v.ret(mut i)
+			}
+			.decl_ {
+				v.decl(mut i)
 			}
 			else {}
 		}

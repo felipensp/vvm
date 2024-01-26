@@ -9,6 +9,9 @@ import strings
 // VM instructions
 pub enum Ins {
 	import_ // import handling
+	oscope_ // begin scope
+	escope_ // end scope
+	decl_ // var declaration
 	call_ // function call
 	add_ // math: + operation
 	sub_ // math: - operation
@@ -71,7 +74,7 @@ pub mut:
 @[heap]
 pub struct VVMIR {
 pub mut:
-	ir_list     []IR // IR list
+	ir_list     []IR = []IR{cap: 30} // IR list
 	entry_point i64  // offset to start
 	tmp_size    i64  // temporary counter
 	fn_map      map[string]i64 // fn map / name => offset
@@ -99,6 +102,7 @@ fn (mut i VVMIR) gen_module(mod &ast.Module) {
 // gen_fn_decl emits IR for fn declaration
 fn (mut i VVMIR) gen_fn_decl(func &ast.FnDecl) {
 	start_addr := i.get_jmp().value as i64
+	i.emit(IR{ ins: .oscope_ })
 	if func.is_main {
 		i.entry_point = start_addr
 		i.gen_stmts(func.stmts)
@@ -107,6 +111,7 @@ fn (mut i VVMIR) gen_fn_decl(func &ast.FnDecl) {
 		i.gen_stmts(func.stmts)
 		i.emit(IR{ ins: .ret_ })
 	}
+	i.emit(IR{ ins: .escope_ })
 }
 
 // gen_call emits IR for fn calling
@@ -133,6 +138,9 @@ fn (mut i VVMIR) get_op(expr &ast.Expr) Operand {
 		}
 		ast.InfixExpr {
 			return i.gen_infixexpr(&expr)
+		}
+		ast.Ident {
+			return i.new_var(expr.name)
 		}
 		else {
 			return Operand{
@@ -175,6 +183,15 @@ fn (mut i VVMIR) new_str(val string) Operand {
 fn (mut i VVMIR) new_lit(val OpValue) Operand {
 	return Operand{
 		typ: .literal
+		value: val
+	}
+}
+
+// new_var creates a var operand
+@[inline]
+fn (mut i VVMIR) new_var(val OpValue) Operand {
+	return Operand{
+		typ: .var
 		value: val
 	}
 }
@@ -232,6 +249,9 @@ fn (mut i VVMIR) gen_if(expr &ast.IfExpr) {
 		mut ir_ := i.emit(IR{
 			ins: .jmpz_
 			op1: i.get_op(branch.cond)
+			res: Operand{
+				typ: .jmp
+			}
 		})
 		i.gen_stmts(branch.stmts)
 		ir_.res = i.get_jmp()
@@ -252,8 +272,15 @@ fn (mut i VVMIR) gen_return(stmt &ast.Return) {
 	}
 }
 
+fn (mut i VVMIR) gen_assign(stmt &ast.AssignStmt) {
+	i.emit(IR{ ins: .decl_, op1: i.get_op(&stmt.left[0]), op2: i.get_op(&stmt.right[0]) })
+}
+
 fn (mut i VVMIR) gen_stmt(stmt &ast.Stmt) {
 	match stmt {
+		ast.AssignStmt {
+			i.gen_assign(&stmt)
+		}
 		ast.Module {
 			i.gen_module(&stmt)
 		}
@@ -270,7 +297,7 @@ fn (mut i VVMIR) gen_stmt(stmt &ast.Stmt) {
 			i.gen_expr(&stmt.expr)
 		}
 		else {
-			dump(stmt)
+			eprintln('unhandled at ${@FN}: ${stmt}')
 		}
 	}
 }
@@ -302,7 +329,7 @@ pub fn (mut i VVMIR) parse_file(file string) {
 	i.gen_file(ast_file)
 }
 
-fn (op Operand) str() string {
+pub fn (op Operand) str() string {
 	mut s := ''
 	s += op.typ.str()[0..3]
 	match op.value {
@@ -334,7 +361,7 @@ pub fn (o &OpValue) str() string {
 			return o.str()
 		}
 		[]Operand {
-			return ''
+			return '[..]'
 		}
 	}
 }
@@ -347,7 +374,8 @@ fn (i IR) str() string {
 pub fn (i VVMIR) str() string {
 	eprintln('Collected IR:')
 	mut s := strings.new_builder(100)
-	for item in i.ir_list {
+	for k, item in i.ir_list {
+		s.write_string('[${k:04d}] ')
 		s.write_string(item.str())
 		s.write_string('\n')
 	}
