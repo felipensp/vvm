@@ -38,7 +38,27 @@ fn (mut i VVMIR) gen_return(stmt &ast.Return) {
 }
 
 fn (mut i VVMIR) gen_assign(stmt &ast.AssignStmt) {
-	i.emit(IR{ ins: .decl_, op1: i.get_op(&stmt.left[0]), op2: i.get_op(&stmt.right[0]) })
+	match stmt.op {
+		.decl_assign {
+			i.emit(IR{ ins: .decl_, op1: i.get_op(&stmt.left[0]), op2: i.get_op(&stmt.right[0]) })
+		}
+		.assign {
+			i.emit(IR{ ins: .assign_, op1: i.get_op(&stmt.left[0]), op2: i.get_op(&stmt.right[0]) })
+		}
+		.plus_assign {
+			i.emit(IR{ ins: .passign_, op1: i.get_op(&stmt.left[0]), op2: i.get_op(&stmt.right[0]) })
+		}
+		.minus_assign {
+			i.emit(IR{ ins: .massign_, op1: i.get_op(&stmt.left[0]), op2: i.get_op(&stmt.right[0]) })
+		}
+		.mult_assign {
+			i.emit(IR{ ins: .muassign_, op1: i.get_op(&stmt.left[0]), op2: i.get_op(&stmt.right[0]) })
+		}
+		.div_assign {
+			i.emit(IR{ ins: .dassign_, op1: i.get_op(&stmt.left[0]), op2: i.get_op(&stmt.right[0]) })
+		}
+		else {}
+	}
 }
 
 fn (mut i VVMIR) gen_stmt(stmt &ast.Stmt) {

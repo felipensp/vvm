@@ -90,6 +90,9 @@ pub fn (mut v VVM) run(mut ir_ ir.VVMIR) {
 			.decl_ { // var decl
 				v.decl(mut i)
 			}
+			.assign_, .passign_, .massign_, .muassign_, .dassign_ { // var assigning
+				v.assign(mut i, i.ins)
+			}
 			else {}
 		}
 		if v.pc == last_pc {

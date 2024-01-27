@@ -8,6 +8,11 @@ pub enum Ins {
 	oscope_ // begin scope
 	escope_ // end scope
 	decl_ // var declaration
+	assign_ // var assigning
+	passign_ // += operation
+	massign_ // -= operation
+	muassign_ // *= operation
+	dassign_ // /= operation
 	pass_ // pass args
 	call_ // function call
 	add_ // math: + operation

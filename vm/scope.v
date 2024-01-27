@@ -37,3 +37,72 @@ fn (mut v VVM) decl(mut i ir.IR) {
 		v.scope[var_name] = *v.get_value(i.op2)
 	}
 }
+
+@[inline]
+fn (mut v VVM) assign(mut i ir.IR, ins ir.Ins) {
+	var_name := i.op1.value as string
+	match ins {
+		.assign_ {
+			unsafe {
+				v.scope[var_name] = *v.get_value(i.op2)
+			}
+		}
+		.passign_ {
+			unsafe {
+				var := v.scope[var_name]
+				match var {
+					int {
+						v.scope[var_name] = var + (v.get_value(i.op2) as int)
+					}
+					i64 {
+						v.scope[var_name] = var + (v.get_value(i.op2) as i64)
+					}
+					else {}
+				}
+			}
+		}
+		.massign_ {
+			unsafe {
+				var := v.scope[var_name]
+				match var {
+					int {
+						v.scope[var_name] = var - (v.get_value(i.op2) as int)
+					}
+					i64 {
+						v.scope[var_name] = var - (v.get_value(i.op2) as i64)
+					}
+					else {}
+				}
+			}
+		}
+		.muassign_ {
+			unsafe {
+				var := v.scope[var_name]
+				match var {
+					int {
+						v.scope[var_name] = var * (v.get_value(i.op2) as int)
+					}
+					i64 {
+						v.scope[var_name] = var * (v.get_value(i.op2) as i64)
+					}
+					else {}
+				}
+			}
+		}
+		.dassign_ {
+			unsafe {
+				var := v.scope[var_name]
+				match var {
+					int {
+						v.scope[var_name] = var / (v.get_value(i.op2) as int)
+					}
+					i64 {
+						v.scope[var_name] = var / (v.get_value(i.op2) as i64)
+					}
+					else {}
+				}
+			}
+		}
+		else {}
+	}
+}
