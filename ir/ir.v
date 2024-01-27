@@ -75,7 +75,7 @@ pub mut:
 @[heap]
 pub struct VVMIR {
 pub mut:
-	ir_list     []IR = []IR{len: 50} // IR list
+	ir_list     []IR = []IR{cap: 50} // IR list
 	entry_point i64  // offset to start
 	tmp_size    i64  // temporary counter
 	fn_map      map[string]i64 // fn map / name => offset
